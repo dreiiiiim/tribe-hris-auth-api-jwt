@@ -9,66 +9,74 @@ import { LoginDto } from './dto/login.dto';
 export class AuthService {
   constructor(private readonly supabaseService: SupabaseService) {}
 
+  // LOGIN (identifier can be email or username hindi name kasi di unique yon)
   // LOGIN (identifier can be email or username)
-  async login(dto: LoginDto) {
-    const supabase = this.supabaseService.getClient();
+async login(loginDto: LoginDto) {
+  const supabase = this.supabaseService.getClient();
 
-    // Step 1: Resolve identifier -> email
-    const email = await this.resolveEmail(dto.identifier);
+  // Step 1: Resolve identifier -> email
+  const email = await this.findEmail(loginDto.identifier);
 
-    // Step 2: Login via Supabase Auth (email + password)
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password: dto.password,
-    });
+  // Step 2: Login via Supabase Auth (email + password)
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password: loginDto.password,
+  });
 
-    if (error || !data.user || !data.session) {
-      throw new UnauthorizedException(error?.message || 'Invalid credentials');
-    }
-
-    return {
-      message: 'Login success',
-      access_token: data.session.access_token,
-      refresh_token: data.session.refresh_token,
-      user: {
-        id: data.user.id,
-        email: data.user.email,
-      },
-      // placeholder role habang wala pa schema
-      role: '',
-    };
+  if (error || !data.user || !data.session) {
+    throw new UnauthorizedException(error?.message || 'Invalid credentials');
   }
 
-  // ME (validate token and return basic user info)
-  async me(accessToken: string) {
-    const supabase = this.supabaseService.getClient();
-
-    const { data, error } = await supabase.auth.getUser(accessToken);
-
-    if (error || !data.user) {
-      throw new UnauthorizedException(error?.message || 'Invalid token');
-    }
-
-    return {
+  return {
+    message: 'Login success',
+    access_token: data.session.access_token,
+    refresh_token: data.session.refresh_token,
+    user: {
       id: data.user.id,
       email: data.user.email,
-    };
+    },
+    role: '', // placeholder until schema ready
+  };
+}
+
+
+// ME (validate token and return basic user info)
+async me(accessToken: string) {
+  const supabase = this.supabaseService.getClient();
+
+  const { data, error } = await supabase.auth.getUser(accessToken);
+
+  if (error || !data.user) {
+    throw new UnauthorizedException(error?.message || 'Invalid token');
   }
 
-  // helper: supports email now; username later when schema is ready
-  private async resolveEmail(identifier: string): Promise<string> {
-    // if it contains '@', assume it's an email
-    if (identifier.includes('@')) return identifier;
+  return {
+    id: data.user.id,
+    email: data.user.email,
+  };
+}
 
-    // TODO: once DB schema is available:
-    // query profiles table: select email where username = identifier
-    // then return that email
 
-    throw new UnauthorizedException(
-      'Username login not available yet. Please login using email for now.',
-    );
+// Helper: resolve username → email
+private async findEmail(identifier: string): Promise<string> {
+  const supabase = this.supabaseService.getClient();
+
+  // If already email
+  if (identifier.includes('@')) return identifier;
+
+  // Query profiles table for username
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('email')
+    .eq('username', identifier)
+    .single();
+    //Go to the profiles table, find the row where username equals the identifier, and return the email column. Expect exactly one result.
+  if (error || !data?.email) {
+    throw new UnauthorizedException('Invalid credentials');
   }
 
+  return data.email;
+}
 
 
   

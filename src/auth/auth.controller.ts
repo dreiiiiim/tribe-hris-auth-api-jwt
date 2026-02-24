@@ -1,5 +1,6 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Post,  Body } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { LoginDto } from './dto/login.dto';
 
 
 //receives the requests extracts data etc, body, params, header ganon and calls the right service and returns the response from service
@@ -15,5 +16,20 @@ export class AuthController {
      PATCH/users/:id
      DELETE/users/:id
     */
+
+
+     @Post('login')
+     login(@Body() loginDto: LoginDto) {
+       return this.authService.login(loginDto);
+     }
+
+
+
+
+
+
+
+
+
 
 }
