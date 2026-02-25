@@ -26,7 +26,7 @@ export class AuthService {
     const supabase = this.supabaseService.getClient();
     const { companyId, identifier, password } = loginDto;
 
-    // ✅ IMPORTANT: escape quotes in identifier to avoid breaking the .or() string
+    // escape quotes for supabase .or() string
     const safeIdentifier = identifier.replaceAll('"', '\\"');
 
     const { data: user, error } = await supabase
@@ -38,33 +38,43 @@ export class AuthService {
       .or(
         `email.eq."${safeIdentifier}",username.eq."${safeIdentifier}",employee_id.eq."${safeIdentifier}"`,
       )
-      .maybeSingle<UserRow>(); // ✅ prevents throw when 0 rows
+      .maybeSingle<UserRow>();
 
-    if (error) {
-      throw new UnauthorizedException('Login failed');
-    }
-
-    if (!user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    if (!user.is_active) {
-      throw new UnauthorizedException('Account inactive');
-    }
-
-    if (!user.password_hash) {
-      throw new UnauthorizedException('No password set');
-    }
+    if (error) throw new UnauthorizedException('Login failed');
+    if (!user) throw new UnauthorizedException('User not found');
+    if (!user.is_active) throw new UnauthorizedException('Account inactive');
+    if (!user.password_hash) throw new UnauthorizedException('No password set');
 
     const isMatch = await bcrypt.compare(password, user.password_hash);
-    if (!isMatch) {
-      throw new UnauthorizedException('Invalid credentials');
+    if (!isMatch) throw new UnauthorizedException('Invalid credentials');
+
+    // fetch role_name for token (for RolesGuard)
+    const { data: roleRow, error: roleError } = await supabase
+      .from('role')
+      .select('role_name')
+      .eq('role_id', user.role_id)
+      .single();
+
+    if (roleError || !roleRow) {
+      throw new UnauthorizedException('Role not found');
+    }
+
+    const { data: companydb, error: companyError } = await supabase
+      .from('company')
+      .select('company_name')
+      .eq('company_id', user.company_id)
+      .single();
+
+    if (companyError || !companydb) {
+      throw new UnauthorizedException('Company not found');
     }
 
     const payload = {
-      sub: user.user_id,
+      sub_userid: user.user_id,
       company_id: user.company_id,
       role_id: user.role_id,
+      role_name: roleRow.role_name,
+      company_name: companydb.company_name,
     };
 
     return {
@@ -77,14 +87,20 @@ export class AuthService {
       const decoded = await this.jwtService.verifyAsync(accessToken);
 
       const supabase = this.supabaseService.getClient();
+
+      // fetch the user by user_id from token (not by identifier) for security
       const { data: user, error } = await supabase
         .from('user_profile')
         .select('user_id, email, username, employee_id, company_id, role_id, is_active')
-        .eq('user_id', decoded.sub)
+        .eq('user_id', decoded.sub) // ✅ correct: get the exact user
         .maybeSingle<UserRow>();
 
       if (error || !user) throw new UnauthorizedException('User not found');
       if (!user.is_active) throw new UnauthorizedException('Account inactive');
+
+
+    
+
 
       return {
         user_id: user.user_id,
@@ -93,6 +109,7 @@ export class AuthService {
         employee_id: user.employee_id,
         company_id: user.company_id,
         role_id: user.role_id,
+        role_name: decoded.role_name, // ✅ already in token
       };
     } catch {
       throw new UnauthorizedException('Invalid token');
