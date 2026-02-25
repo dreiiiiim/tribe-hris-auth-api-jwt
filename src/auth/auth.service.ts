@@ -49,7 +49,7 @@ export class AuthService {
     if (!isMatch) throw new UnauthorizedException('Invalid credentials');
 
     // fetch role_name for token (for RolesGuard)
-    const { data: roleRow, error: roleError } = await supabase
+    const { data: roleRow, error: roleError } = await supabase // getting role name from role table using role id from user table for token payload
       .from('role')
       .select('role_name')
       .eq('role_id', user.role_id)
@@ -59,7 +59,7 @@ export class AuthService {
       throw new UnauthorizedException('Role not found');
     }
 
-    const { data: companydb, error: companyError } = await supabase
+    const { data: companydb, error: companyError } = await supabase//getting info from table using company id from user table to get company name for token payload
       .from('company')
       .select('company_name')
       .eq('company_id', user.company_id)
@@ -69,7 +69,7 @@ export class AuthService {
       throw new UnauthorizedException('Company not found');
     }
 
-    const payload = {
+    const payload = { // ito ung info na hinanap sa taas para i-include sa JWT token
       sub_userid: user.user_id,
       company_id: user.company_id,
       role_id: user.role_id,
