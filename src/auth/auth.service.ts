@@ -1,84 +1,101 @@
-import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcryptjs';
 import { SupabaseService } from '../supabase/supabase.service';
 import { LoginDto } from './dto/login.dto';
 
+type UserRow = {
+  user_id: string;
+  company_id: string;
+  role_id: number;
+  email: string;
+  username: string | null;
+  employee_id: string | null;
+  password_hash: string | null;
+  is_active: boolean;
+};
 
-
-//main logic na call from controllers
 @Injectable()
 export class AuthService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly jwtService: JwtService,
+  ) {}
 
-  // LOGIN (identifier can be email or username hindi name kasi di unique yon)
-  // LOGIN (identifier can be email or username)
-async login(loginDto: LoginDto) {
-  const supabase = this.supabaseService.getClient();
+  async login(loginDto: LoginDto) {
+    const supabase = this.supabaseService.getClient();
+    const { companyId, identifier, password } = loginDto;
 
-  // Step 1: Resolve identifier -> email
-  const email = await this.findEmail(loginDto.identifier);
+    // ✅ IMPORTANT: escape quotes in identifier to avoid breaking the .or() string
+    const safeIdentifier = identifier.replaceAll('"', '\\"');
 
-  // Step 2: Login via Supabase Auth (email + password)
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password: loginDto.password,
-  });
+    const { data: user, error } = await supabase
+      .from('user_profile')
+      .select(
+        'user_id, company_id, role_id, password_hash, is_active, email, username, employee_id',
+      )
+      .eq('company_id', companyId)
+      .or(
+        `email.eq."${safeIdentifier}",username.eq."${safeIdentifier}",employee_id.eq."${safeIdentifier}"`,
+      )
+      .maybeSingle<UserRow>(); // ✅ prevents throw when 0 rows
 
-  if (error || !data.user || !data.session) {
-    throw new UnauthorizedException(error?.message || 'Invalid credentials');
+    if (error) {
+      throw new UnauthorizedException('Login failed');
+    }
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if (!user.is_active) {
+      throw new UnauthorizedException('Account inactive');
+    }
+
+    if (!user.password_hash) {
+      throw new UnauthorizedException('No password set');
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+    if (!isMatch) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const payload = {
+      sub: user.user_id,
+      company_id: user.company_id,
+      role_id: user.role_id,
+    };
+
+    return {
+      access_token: await this.jwtService.signAsync(payload),
+    };
   }
 
-  return {
-    message: 'Login success',
-    access_token: data.session.access_token,
-    refresh_token: data.session.refresh_token,
-    user: {
-      id: data.user.id,
-      email: data.user.email,
-    },
-    role: '', // placeholder until schema ready
-  };
-}
+  async me(accessToken: string) {
+    try {
+      const decoded = await this.jwtService.verifyAsync(accessToken);
 
+      const supabase = this.supabaseService.getClient();
+      const { data: user, error } = await supabase
+        .from('user_profile')
+        .select('user_id, email, username, employee_id, company_id, role_id, is_active')
+        .eq('user_id', decoded.sub)
+        .maybeSingle<UserRow>();
 
-// ME (validate token and return basic user info)
-async me(accessToken: string) {
-  const supabase = this.supabaseService.getClient();
+      if (error || !user) throw new UnauthorizedException('User not found');
+      if (!user.is_active) throw new UnauthorizedException('Account inactive');
 
-  const { data, error } = await supabase.auth.getUser(accessToken);
-
-  if (error || !data.user) {
-    throw new UnauthorizedException(error?.message || 'Invalid token');
+      return {
+        user_id: user.user_id,
+        email: user.email,
+        username: user.username,
+        employee_id: user.employee_id,
+        company_id: user.company_id,
+        role_id: user.role_id,
+      };
+    } catch {
+      throw new UnauthorizedException('Invalid token');
+    }
   }
-
-  return {
-    id: data.user.id,
-    email: data.user.email,
-  };
 }
-
-
-// Helper: resolve username → email
-private async findEmail(identifier: string): Promise<string> {
-  const supabase = this.supabaseService.getClient();
-
-  // If already email
-  if (identifier.includes('@')) return identifier;
-
-  // Query profiles table for username
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('email')
-    .eq('username', identifier)
-    .single();
-    //Go to the profiles table, find the row where username equals the identifier, and return the email column. Expect exactly one result.
-  if (error || !data?.email) {
-    throw new UnauthorizedException('Invalid credentials');
-  }
-
-  return data.email;
-}
-
-
-  
-}
-

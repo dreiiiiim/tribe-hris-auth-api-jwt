@@ -1,35 +1,25 @@
-import { Controller, Post,  Body } from '@nestjs/common';
+import { Controller, Post, Body, Get, Headers, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 
-
-//receives the requests extracts data etc, body, params, header ganon and calls the right service and returns the response from service
 @Controller()
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-   /* EXAMPLES CRUD
-   
-     GET/users
-     GET/users/:id
-     POST/users
-     PATCH/users/:id
-     DELETE/users/:id
-    */
+  @Post('login')
+  login(@Body() loginDto: LoginDto) {
+    return this.authService.login(loginDto);
+  }
 
+  @Get('me')
+  me(@Headers('authorization') authHeader?: string) {
+    if (!authHeader) throw new UnauthorizedException('Missing Authorization header');
 
-     @Post('login')
-     login(@Body() loginDto: LoginDto) {
-       return this.authService.login(loginDto);
-     }
+    const [type, token] = authHeader.split(' ');
+    if (type !== 'Bearer' || !token) {
+      throw new UnauthorizedException('Invalid Authorization header format');
+    }
 
-
-
-
-
-
-
-
-
-
+    return this.authService.me(token);
+  }
 }

@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength } from 'class-validator';
+
 
 // Ito yung structure ng data na tatanggapin ng login endpoint.
 
@@ -15,9 +15,17 @@ import { IsEmail, IsString, MinLength } from 'class-validator';
 // login.dto.ts
 
 
+
+import { IsNotEmpty, IsString, IsUUID, MinLength } from 'class-validator';
+
 export class LoginDto {
+  @IsUUID()
+  @IsNotEmpty()
+  companyId: string;
+
   @IsString()
-  identifier: string; // accepts either email or username
+  @IsNotEmpty()
+  identifier: string; // email OR username OR employee_id
 
   @IsString()
   @MinLength(6)

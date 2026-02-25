@@ -8,18 +8,18 @@ export class SupabaseService {
 
   constructor(private readonly config: ConfigService) {
     const url = this.config.get<string>('SUPABASE_URL');
-    const anonKey = this.config.get<string>('SUPABASE_ANON_KEY');
+    const serviceRoleKey = this.config.get<string>('SUPABASE_SERVICE_ROLE_KEY');
 
-    if (!url || !anonKey) {
-      throw new Error('Missing SUPABASE_URL or SUPABASE_ANON_KEY in .env');
+    if (!url || !serviceRoleKey) {
+      throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env');
     }
 
-    this.client = createClient(url, anonKey);
+    this.client = createClient(url, serviceRoleKey, {
+      auth: { persistSession: false }, // optional, nice for backend
+    });
   }
 
-    getClient(): SupabaseClient {
+  getClient(): SupabaseClient {
     return this.client;
   }
-
-//  
 }
