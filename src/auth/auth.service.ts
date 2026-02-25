@@ -15,6 +15,28 @@ type UserRow = {
   is_active: boolean;
 };
 
+
+// create table public.user_profile (
+//   user_id uuid not null default gen_random_uuid (),
+//   role_id integer not null,
+//   company_id uuid not null,
+//   employee_id character varying null,
+//   first_name character varying not null,
+//   last_name character varying not null,
+//   email character varying not null,
+//   is_first_login boolean null default true,
+//   username character varying null,
+//   password_hash character varying null,
+//   is_active boolean null default true,
+//   constraint user_profile_pkey primary key (user_id),
+//   constraint user_profile_company_email_unique unique (company_id, email), // unique per company but can have same email in different companies (for multi-tenant)
+//   constraint user_profile_company_employee_unique unique (company_id, employee_id), // unique per company but can have same employee_id in different companies (for multi-tenant)
+//   constraint user_profile_company_username_unique unique (company_id, username),
+//   constraint user_profile_company_id_fkey foreign KEY (company_id) references company (company_id) on delete CASCADE,
+//   constraint user_profile_role_id_fkey foreign KEY (role_id) references role (role_id) on delete RESTRICT
+// ) TABLESPACE pg_default;
+
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -27,6 +49,10 @@ export class AuthService {
     const { companyId, identifier, password } = loginDto;
 
     // escape quotes for supabase .or() string
+    // IF WANT NA NO COMPANY ID
+    //Option A: Make email (and/or username) globally unique (simplest)
+    //OPTION B: COMPANY ID REQUIRED IF WANT EMAIL AND USERNAME UNIQUE PER COMPANY BUT NOT GLOBALLY (more flexible but need to always include company id in login)
+    
     const safeIdentifier = identifier.replaceAll('"', '\\"');
 
     const { data: user, error } = await supabase

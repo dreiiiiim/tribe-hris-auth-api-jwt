@@ -17,7 +17,6 @@ findAll(@Req() req: any) {
   return {
     message: 'Users endpoint working',
     role: req.user.role_name,
-    companydb: req.user.company_name,
     user: req.user,
     
   };
@@ -37,7 +36,7 @@ findAll(@Req() req: any) {
 
 
   @UseGuards(RolesGuard)
-  @Roles('ADMIN')
+  @Roles('ADMIN') // name na nakalagay dito dapat exact sa supabase or hindi magwowork access sa endpoint
   @Patch(':id')
   update(
     @Param('id') id: string,
