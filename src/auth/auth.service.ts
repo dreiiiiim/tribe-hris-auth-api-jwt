@@ -44,69 +44,67 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async login(loginDto: LoginDto) {
-    const supabase = this.supabaseService.getClient();
-    const { companyId, identifier, password } = loginDto;
+async login(loginDto: LoginDto) {
+  const supabase = this.supabaseService.getClient();
+  const { identifier, password } = loginDto;
 
-    // escape quotes for supabase .or() string
-    // IF WANT NA NO COMPANY ID
-    //Option A: Make email (and/or username) globally unique (simplest)
-    //OPTION B: COMPANY ID REQUIRED IF WANT EMAIL AND USERNAME UNIQUE PER COMPANY BUT NOT GLOBALLY (more flexible but need to always include company id in login)
-    
-    const safeIdentifier = identifier.replaceAll('"', '\\"');
+  // escape quotes for supabase .or() string
+  // email and username are globally unique, no need for company id
+  // employee_id removed as identifier since it's only unique per company
+  
+  const safeIdentifier = identifier.replaceAll('"', '\\"');
 
-    const { data: user, error } = await supabase
-      .from('user_profile')
-      .select(
-        'user_id, company_id, role_id, password_hash, is_active, email, username, employee_id',
-      )
-      .eq('company_id', companyId)
-      .or(
-        `email.eq."${safeIdentifier}",username.eq."${safeIdentifier}",employee_id.eq."${safeIdentifier}"`,
-      )
-      .maybeSingle<UserRow>();
+  const { data: user, error } = await supabase
+    .from('user_profile')
+    .select(
+      'user_id, company_id, role_id, password_hash, is_active, email, username',
+    )
+    .or(
+      `email.eq."${safeIdentifier}",username.eq."${safeIdentifier}"`,
+    )
+    .maybeSingle<UserRow>();
 
-    if (error) throw new UnauthorizedException('Login failed');
-    if (!user) throw new UnauthorizedException('User not found');
-    if (!user.is_active) throw new UnauthorizedException('Account inactive');
-    if (!user.password_hash) throw new UnauthorizedException('No password set');
+  if (error) throw new UnauthorizedException('Login failed');
+  if (!user) throw new UnauthorizedException('User not found');
+  if (!user.is_active) throw new UnauthorizedException('Account inactive');
+  if (!user.password_hash) throw new UnauthorizedException('No password set');
 
-    const isMatch = await bcrypt.compare(password, user.password_hash);
-    if (!isMatch) throw new UnauthorizedException('Invalid credentials');
+  const isMatch = await bcrypt.compare(password, user.password_hash);
+  if (!isMatch) throw new UnauthorizedException('Invalid credentials');
 
-    // fetch role_name for token (for RolesGuard)
-    const { data: roleRow, error: roleError } = await supabase // getting role name from role table using role id from user table for token payload
-      .from('role')
-      .select('role_name')
-      .eq('role_id', user.role_id)
-      .single();
+  // fetch role_name for token (for RolesGuard)
+  const { data: roleRow, error: roleError } = await supabase // getting role name from role table using role id from user table for token payload
+    .from('role')
+    .select('role_name')
+    .eq('role_id', user.role_id)
+    .single();
 
-    if (roleError || !roleRow) {
-      throw new UnauthorizedException('Role not found');
-    }
-
-    const { data: companydb, error: companyError } = await supabase//getting info from table using company id from user table to get company name for token payload
-      .from('company')
-      .select('company_name')
-      .eq('company_id', user.company_id)
-      .single();
-
-    if (companyError || !companydb) {
-      throw new UnauthorizedException('Company not found');
-    }
-
-    const payload = { // ito ung info na hinanap sa taas para i-include sa JWT token
-      sub_userid: user.user_id,
-      company_id: user.company_id,
-      role_id: user.role_id,
-      role_name: roleRow.role_name,
-      company_name: companydb.company_name,
-    };
-
-    return {
-      access_token: await this.jwtService.signAsync(payload),
-    };
+  if (roleError || !roleRow) {
+    throw new UnauthorizedException('Role not found');
   }
+
+  const { data: companydb, error: companyError } = await supabase //getting info from table using company id from user table to get company name for token payload
+    .from('company')
+    .select('company_name')
+    .eq('company_id', user.company_id)
+    .single();
+
+  if (companyError || !companydb) {
+    throw new UnauthorizedException('Company not found');
+  }
+
+  const payload = { // ito ung info na hinanap sa taas para i-include sa JWT token
+    sub_userid: user.user_id,
+    company_id: user.company_id,
+    role_id: user.role_id,
+    role_name: roleRow.role_name,
+    company_name: companydb.company_name,
+  };
+
+  return {
+    access_token: await this.jwtService.signAsync(payload),
+  };
+}
 
   async me(accessToken: string) {
     try {

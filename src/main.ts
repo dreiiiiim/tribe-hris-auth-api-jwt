@@ -17,7 +17,7 @@ async function bootstrap() {
 
   // Swagger/OpenAPI
   const config = new DocumentBuilder()
-    .setTitle('API Center Shared Auth API')
+    .setTitle('Blue Tribe Authentication APIs')
     .setDescription('Authentication endpoints for shared platform usage.')
     .setVersion('1.0')
     .addBearerAuth()
