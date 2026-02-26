@@ -57,7 +57,7 @@ async login(loginDto: LoginDto) {
   const { data: user, error } = await supabase
     .from('user_profile')
     .select(
-      'user_id, company_id, role_id, password_hash, is_active, email, username',
+      'user_id, company_id, role_id, password_hash, email, username',
     )
     .or(
       `email.eq."${safeIdentifier}",username.eq."${safeIdentifier}"`,
@@ -66,7 +66,7 @@ async login(loginDto: LoginDto) {
 
   if (error) throw new UnauthorizedException('Login failed');
   if (!user) throw new UnauthorizedException('User not found');
-  if (!user.is_active) throw new UnauthorizedException('Account inactive');
+  //if (!user.is_active) throw new UnauthorizedException('Account inactive');
   if (!user.password_hash) throw new UnauthorizedException('No password set');
 
   const isMatch = await bcrypt.compare(password, user.password_hash);
