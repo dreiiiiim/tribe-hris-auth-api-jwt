@@ -16,7 +16,7 @@
 
 
 
-import { IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { IsNotEmpty, IsString, MinLength, IsBoolean} from 'class-validator';
 
 export class LoginDto {
 
@@ -27,4 +27,10 @@ export class LoginDto {
   @IsString()
   @MinLength(6)
   password: string;
+
+  @IsBoolean()
+  rememberMe?: boolean; // true = long refresh token lifetime
+
+
 }
+

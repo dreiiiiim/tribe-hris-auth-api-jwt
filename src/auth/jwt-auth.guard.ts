@@ -20,13 +20,18 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Invalid Authorization header format');
     }
 
-    try {
-      // ✅ verify token and attach user payload to req.user
+      try {
       const decoded = this.jwtService.verify(token);
-      req.user = decoded; // { sub, company_id, role_id, iat, exp }
+
+      //  BLOCK refresh tokens from accessing protected routes
+      if (decoded.type !== 'access') {
+        throw new UnauthorizedException('Access token required');
+      }
+
+      req.user = decoded;
       return true;
     } catch {
       throw new UnauthorizedException('Invalid token');
-    }
+}
   }
 }

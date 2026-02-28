@@ -11,6 +11,16 @@ export class AuthController {
     return this.authService.login(loginDto);
   }
 
+  @Post('refresh')
+  refresh(@Body() body: { refresh_token: string }) {
+    return this.authService.refresh(body.refresh_token);
+  }
+
+  @Post('logout')
+  logout(@Body() body: { refresh_token: string }) {
+    return this.authService.logout(body.refresh_token);
+  }
+
   @Get('me')
   me(@Headers('authorization') authHeader?: string) {
     if (!authHeader) throw new UnauthorizedException('Missing Authorization header');

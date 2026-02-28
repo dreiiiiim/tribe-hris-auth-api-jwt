@@ -5,6 +5,9 @@
 AFTRER CLONING
 npm install
 
+ONLY MISSING PART IS LOGIN HISTORY AND LOGOUT HISTORY
+FORGOT PASSWORD
+
 ```
 nest new apicenter-shared-auth-api
 
